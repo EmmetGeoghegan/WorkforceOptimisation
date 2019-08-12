@@ -1,15 +1,5 @@
-import pandas as pd
-import random
 
-
-# Excel Parser
-def createdf(filename, sheetname):
-    try:
-        xlsx = pd.ExcelFile(filename)
-        dataframe = pd.DataFrame(pd.read_excel(xlsx, sheetname, index_col=False))
-        return(dataframe)
-    except FileNotFoundError:
-        print("File not found")
+import myfuncs as mf
 
 
 # Job Class
@@ -17,7 +7,6 @@ class Jobs:
     def __init__(self, name, time):
         self.name = name
         self.time = time
-        self.assigned = False
 
 
 # People Class
@@ -31,23 +20,21 @@ class People:
     # Add a Job to a persons workflow
     def addjob(self, Job):
         self.remainingtime = round(self.remainingtime - Job.time, 2)
-        Job.assigned = True
         self.jobs.append(Job)
 
     # Remove a Job from a persons workflow
     def removejob(self, Job):
         self.remainingtime = round(self.remainingtime + Job.time, 2)
-        Job.assigned = False
         self.jobs.remove(Job)
 
 
 # Generate our employee data
-all_people = createdf("data.xlsx", "People")
+all_people = mf.createdf("data.xlsx", "People")
 peoplenames = all_people["Person"].values
 peoplevalues = all_people["Time Available"].values
 
 # Generate our Job data
-all_jobs = createdf("data.xlsx", "Jobs")
+all_jobs = mf.createdf("data.xlsx", "Jobs")
 jobnames = all_jobs["Project"].values
 jobvalues = all_jobs["Average Time Per Week (Hours)"].values
 
@@ -62,128 +49,71 @@ Job_Objects = []
 for i in range(len(jobnames)):
     Job_Objects.append(Jobs(jobnames[i], jobvalues[i]))
 
-# for i in People_Objects:
-#     print(i.name, i.time)
-#
-# for i in Job_Objects:
-#     print(i.name, i.time)
-
-# Go through jobs
-# Assign to people in round robin
-# Remove the job from available list
-# Add job to the assigned list
-
-
+# Assign our Fluid lists
 Peopletobeassigned = People_Objects
 Jobstobeassigned = Job_Objects
 
 
-def fitnessfunc(People):
-    totaltime = 0
-    for i in People:
-        totaltime += abs(i.remainingtime)
-    return totaltime
-
-
-def spreadJobs(People, Jobs):
-    while Jobs != []:
-        rand_person = random.choice(People)
-        rand_job = random.choice(Jobs)
-        rand_person.addjob(rand_job)
-        Jobs.remove(rand_job)
-
-
-def gettimes(person_list):
-    timelist = []
-    for i in person_list:
-        timelist.append(i.remainingtime)
-    index_min = min(range(len(timelist)), key=timelist.__getitem__)
-    return index_min
-        # Look at test func
-
-
-def stripjobs(Person):
-    # print(Person.name, [x.name for x in Person.jobs])
-    jobs = []
-    jobs += Person.jobs
-    for j in Person.jobs[:]:
-        Person.removejob(j)
-    return jobs
-
-# # Do Our first assign
-# while Job_Objects != []:
-#     rand_person = random.choice(People_Objects)
-#     rand_job = random.choice(Job_Objects)
-#     assigned_jobs.append(rand_job)
-#     rand_person.addjob(rand_job)
-#     Job_Objects.remove(rand_job)
+# Spawn our initial People - Job configurations
 print("-------- Spawn ------------")
-spreadJobs(Peopletobeassigned, Jobstobeassigned)
+mf.spreadJobsRandomly(Peopletobeassigned, Jobstobeassigned)
+
+
+# Set variable to be an initial value well out of the range
 bestscore = 100000
-for rounds in range(1,200000,1):
-    print("      ")
-    print(f"ROUND {rounds}")
-    print("      ")
+
+# The number of Generations we want to run
+Generations = 1000
+
+# Our Optimisation loop
+for rounds in range(1, Generations+1, 1):
+
+    print(f"Generation {rounds}")
+
+    # The people who we stole jobs from
     Peopletobeassigned = []
-    configscore = fitnessfunc(People_Objects)
+
+    # Get the score of our current configuration
+    configscore = mf.fitnessfunc(People_Objects)
+
+    # If we get a new highscore save it in memory
     if configscore < bestscore:
         bestconfig = []
         bestscore = configscore
         for i in People_Objects:
             bestconfig.append([i.name, i.time, i.remainingtime, [x.name for x in i.jobs]])
 
+    # Loop over all Employees, Any who are over burdened we remove their jobs
     for i in People_Objects:
-        # print(i.name, i.time, i.remainingtime, [x.name for x in i.jobs])
         if i.remainingtime < 0:
             Peopletobeassigned.append(i)
             Jobstobeassigned += i.jobs
             for j in i.jobs[:]:
                 i.removejob(j)
 
-
-    # print("      ")
-    # print(f"After Checking")
-    # print("      ")
-    # print("--- Jobless People ---")
-    # print([x.name for x in Peopletobeassigned])
-    # print("----------------------")
-    # print("      ")
-    # print("--- Peopleless Jobs ---")
-    # print([x.name for x in Jobstobeassigned])
-    # print("-----------------------")
-    # print("   ")
-    #
-    # print("------- After Removal --------")
-    # for i in People_Objects:
-    #     print(i.name, i.remainingtime, [x.name for x in i.jobs])
-    # print("  ")
-    #
-    # print(f"The Lowest person is {gettimes(People_Objects)+1}")
-    weakestlink = gettimes(People_Objects)
-    # print("BEFORE", [x.name for x in Jobstobeassigned])
-    Jobstobeassigned += stripjobs(People_Objects[weakestlink])
-    # print("AFTER", [x.name for x in Jobstobeassigned])
-
+    # Get the person with the most free time
+    weakestlink = mf.getbiggesttimes(People_Objects)
+    # Strip their jobs
+    Jobstobeassigned += mf.stripjobs(People_Objects[weakestlink])
+    # Add them to the pool
     Peopletobeassigned.append(People_Objects[weakestlink])
-    # print("--- Jobless People ---")
-    # print([x.name for x in Peopletobeassigned])
-    # print("----------------------")
-    # print("      ")
-    # print("--- Peopleless Jobs ---")
-    # print([x.name for x in Jobstobeassigned])
-    # print("-----------------------")
 
-    spreadJobs(Peopletobeassigned, Jobstobeassigned)
-    # print(" ")
-    # print(" ")
-# print("------")
-# for i in People_Objects:
-#     print(i.name, i.time, i.remainingtime, [x.name for x in i.jobs])
-#
+    # If we have less than 2
+    # Get the next person with the most free time and do the same
+    if len(Peopletobeassigned) < 2:
+        weakestlink = mf.getlowesttimes(People_Objects)
+        Jobstobeassigned += mf.stripjobs(People_Objects[weakestlink])
+        Peopletobeassigned.append(People_Objects[weakestlink])
 
-# print("--------")
-# print([x.name for x in Job_Objects])
-# print([x.name for x in Peopletobeassigned])
 
+    # Spread our jobs randomly again
+    mf.spreadJobsRandomly(Peopletobeassigned, Jobstobeassigned)
+    print(" ")
+    print(" ")
+
+
+print("------")
 print(f"Best score: {bestscore}")
-print(f"Best Config: \n {bestconfig}")
+print(f"Best Config: \n")
+for i in bestconfig:
+    print(i)
