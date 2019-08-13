@@ -63,7 +63,7 @@ mf.spreadJobsRandomly(Peopletobeassigned, Jobstobeassigned)
 bestscore = 100000
 
 # The number of Generations we want to run
-Generations = 1000
+Generations = 10000000
 
 # Our Optimisation loop
 for rounds in range(1, Generations+1, 1):

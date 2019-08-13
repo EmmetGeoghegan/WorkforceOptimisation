@@ -16,7 +16,10 @@ def createdf(filename, sheetname):
 def fitnessfunc(People):
     totaltime = 0
     for i in People:
-        totaltime += abs(i.remainingtime)
+        if i.remainingtime < 0:
+            totaltime += 1000000
+        else:
+            totaltime += i.remainingtime
         totaltime = totaltime/len(People)
     return totaltime
 
